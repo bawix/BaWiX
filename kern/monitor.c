@@ -25,8 +25,18 @@ static struct Command commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "backtrace", "Stack", mon_backtrace },
 	{ "bawix", "by BaWiX_", BaWiX },
+	{ "clear", "- CLEAR Display", clr },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
+	{ "exit", "Exit", exit },
 };
+int
+clr()
+{
+cprintf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
+return 0;
+}
+
+
 
 /***** Implementations of basic kernel monitor commands *****/
 
@@ -40,12 +50,21 @@ mon_help(int argc, char **argv, struct Trapframe *tf)
 	return 0;
 }
 int
-BaWiX()
+exit()
 {
     cprintf("by BaWiX_ \n");
+//asm("movw $0x1000,%ax;	movw %ax,%ss;	movw $0xf000,%sp;	movw $0x5307,%ax;	movw $1,%bx;	movw $3,%cx;	int  $0x15");
+
+asm("    mov %ax, 0x1000;    mov %ax, %ss;    mov %sp, 0xf000;    mov %ax, 0x5307;    mov %bx, 0x0001;    mov %cx, 0x0003; int $0x15 ;");
 return 0;
 }
 
+int
+BaWiX()
+{
+cprintf("\t \t by BAWiX_");
+return 0;
+}
 
 int
 mon_kerninfo(int argc, char **argv, struct Trapframe *tf)
@@ -137,6 +156,9 @@ monitor(struct Trapframe *tf)
 {
 	char *buf;
 
+	cprintf("\n\n\n\n");
+	cprintf("      ##  #######  ##    ##    ###    ##    ##     #######   ######  \n      ## ##     ## ##   ##    ## ##    ##  ##     ##     ## ##    ## \n      ## ##     ## ##  ##    ##   ##    ####      ##     ## ##       \n      ## ##     ## #####    ##     ##    ##       ##     ##  ######  \n##    ## ##     ## ##  ##   #########    ##       ##     ##       ## \n##    ## ##     ## ##   ##  ##     ##    ##       ##     ## ##    ## \n ######   #######  ##    ## ##     ##    ##        #######   ######  \n");
+	
 	cprintf("\n\nWelcome to the Jokay OS kernel monitor!\n");
 	cprintf("Type 'help' for a list of commands.\n");
 
