@@ -48,6 +48,8 @@ i386_detect_memory(void)
 		totalmem = 1 * 1024 + extmem;
 	else
 		totalmem = basemem;
+	
+	cprintf("\nTOTO : %d\n\n",totalmem);
 
 	npages = totalmem / (PGSIZE / 1024);
 	npages_basemem = basemem / (PGSIZE / 1024);
@@ -78,7 +80,7 @@ static void check_page_installed_pgdir(void);
 // If n==0, returns the address of the next free page without allocating
 // anything.
 //
-// If we're out of memory, boot_alloc should panic.
+// If we're out of memory, boot_alloc should panic.??0xf0400000???
 // This function may ONLY be used during initialization,
 // before the page_free_list list has been set up.
 static void *
@@ -102,11 +104,45 @@ boot_alloc(uint32_t n)
 	// to a multiple of PGSIZE.
 	//
 	// LAB 2: Your code here.
+	/*if (n > 0) {
+		uint32_t alloc_size = ROUNDUP(n, PGSIZE);
+
+		result = nextfree;
+		nextfree += alloc_size;
+
+		if ((uintptr_t)nextfree >= adressa)
+		   panic("boot_alloc: Ej do pici");
+	} else {
+		result = nextfree;
+	}
+
+	return result;
+	cprintf("boot_alloc memory at %x\n", nextfree);
+	cprintf("Next memory at %x\n", ROUNDUP((char *) (nextfree+n), PGSIZE));
+	if (n != 0) {
+		char *next = nextfree;
+		nextfree = ROUNDUP((char *) (nextfree+n), PGSIZE);
+		return next;
+	} else return nextfree;*/
+
+
+
+
+if (n == 0) {
+	  return nextfree;
+	}
 	
+	if(n > (PGSIZE * npages - PADDR(nextfree))) {
+	  panic("Not enough free memory\n");
+	}
+
+	to_return = nextfree;
+	nextfree = ROUNDUP((char *) (nextfree + n), PGSIZE);	
+	
+	return to_return;
 
 
 
-	return NULL;
 }
 
 // Set up a two-level page table:
@@ -128,7 +164,7 @@ mem_init(void)
 	i386_detect_memory();
 
 	// Remove this line when you're ready to test this function.
-	panic("mem_init: This function is not finished\n");
+	//panic("mem_init: This function is not finished\n");
 
 	//////////////////////////////////////////////////////////////////////
 	// create initial page directory.
@@ -151,7 +187,9 @@ mem_init(void)
 	// array.  'npages' is the number of physical pages in memory.  Use memset
 	// to initialize all fields of each struct PageInfo to 0.
 	// Your code goes here:
-
+	pages = (struct PageInfo *)boot_alloc(npages * sizeof(struct PageInfo));
+	memset(pages,0,sizeof(struct PageInfo)*npages);
+	
 
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
@@ -254,13 +292,59 @@ page_init(void)
 	// Change the code to reflect this.
 	// NB: DO NOT actually touch the physical memory corresponding to
 	// free pages!
-	size_t i;
+	/*size_t i;
 
 	for (i = 0; i < npages; i++) {
 		pages[i].pp_ref = 0;
 		pages[i].pp_link = page_free_list;
 		page_free_list = &pages[i];
+	}*/
+
+
+	/*size_t i;
+	for (i = 1; i < npages_basemem; i++) {
+		pages[i].pp_ref = 0;
+		pages[i].pp_link = page_free_list;
+		page_free_list = &pages[i];
 	}
+	int med = (int)ROUNDUP((pages) + (sizeof(struct PageInfo) * npages) - KERNBASE, PGSIZE)/PGSIZE;
+		cprintf("\n\nnpages: %d\n\n", npages);
+	cprintf("\nsizeof(struct PageInfo): %x\n\n",sizeof(struct PageInfo));
+	cprintf("\n(char*)pages: %x\n\n",pages);
+	cprintf("\nKERNBASE: %x\n\n", KERNBASE);
+	cprintf("\nPGSIZE: %d\n\n", PGSIZE);
+	cprintf("\nblbost: %x\n\n", (sizeof(struct PageInfo) * npages));
+	cprintf("\nblbost2: %x\n\n", ((pages) + (sizeof(struct PageInfo) * npages) - KERNBASE));
+	cprintf("\nblbost3: %x\n\n",ROUNDUP((pages) + (sizeof(struct PageInfo) * npages) - KERNBASE, PGSIZE));
+	
+	cprintf("blbos46546546546546546546546546546 %x\n", (PADDR(ROUNDUP((pages) + (sizeof(struct PageInfo) * npages), PGSIZE))));
+	cprintf("\nblbost4: %x\n\n",((int)ROUNDUP((pages) + (sizeof(struct PageInfo) * npages) - KERNBASE, PGSIZE)/PGSIZE));
+	
+	cprintf("%d\n", ((char*)pages) + (sizeof(struct PageInfo) * npages));
+	cprintf("med=%d\n", med);
+	for (i = med; i < npages; i++) {
+		pages[i].pp_ref = 0;
+		pages[i].pp_link = page_free_list;
+		page_free_list = &pages[i];
+	}*/
+	size_t i;
+	for (i = 1; i < npages_basemem; i++) {
+		pages[i].pp_ref = 0;
+		pages[i].pp_link = page_free_list;
+		page_free_list = &pages[i];
+	}
+	cprintf("%m%s",0x0200,"AHOJ");
+	int med = (int)ROUNDUP(((char*)pages) + (sizeof(struct PageInfo) * npages) - 0xf0000000, PGSIZE)/PGSIZE;
+	cprintf("%d\n", ((char*)pages) + (sizeof(struct PageInfo) * npages));
+	cprintf("med=%d\n", med);
+	for (i = med; i < npages; i++) {
+		pages[i].pp_ref = 0;
+		pages[i].pp_link = page_free_list;
+		page_free_list = &pages[i];
+	}
+	
+	
+	
 }
 		
 //
@@ -278,9 +362,14 @@ page_init(void)
 struct PageInfo *
 page_alloc(int alloc_flags)
 {
-	// Fill this function in
-
-	return 0;
+	if (page_free_list) {
+		struct PageInfo *ret = page_free_list;
+		page_free_list = page_free_list->pp_link;
+		if (alloc_flags & ALLOC_ZERO) 
+			memset(page2kva(ret), 0, PGSIZE);
+		return ret;
+	}
+	return NULL;
 }
 
 //
@@ -289,10 +378,22 @@ page_alloc(int alloc_flags)
 //
 void
 page_free(struct PageInfo *pp)
-{
+{	
 	// Fill this function in
 	// Hint: You may want to panic if pp->pp_ref is nonzero or
 	// pp->pp_link is not NULL.
+	//cprintf("LINK: %x \t REF: %d\n",pp->pp_link,pp->pp_ref);
+//&&(pp->pp_ref!=0)
+	/*if ((pp->pp_link!=NULL))
+	{
+	panic("EJ DO RITI");
+	}
+	else{
+	
+	}*/
+
+	pp->pp_link = page_free_list;
+	page_free_list = pp;
 
 }
 
