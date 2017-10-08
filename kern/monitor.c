@@ -410,23 +410,6 @@ runcmd(char *buf, struct Trapframe *tf)
 }
 
 
-void
-skuska(){
-char name;
-    int  number;
-    FILE *f;
-    f = fopen("contacts.pcl", "a");
-
-    printf("\nNew contact name: ");
-    scanf("%s", &name);
-    printf("New contact number: ");
-    scanf("%i", &number);
-
-
-    fprintf(f, "%c\n[ %d ]\n\n", name, number);
-    fclose(f);
-}
-
 
 void
 monitor(struct Trapframe *tf)
@@ -445,7 +428,7 @@ monitor(struct Trapframe *tf)
 		
 		buf = readline("K> ");
 		if((*buf==-30)||(*buf==91)){
-			skuska();
+		
 					cprintf("%d",*buf);
 		}
 		
