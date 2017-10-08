@@ -7,6 +7,7 @@
 #include <inc/assert.h>
 #include <inc/x86.h>
 
+#include <kern/JOMA.c>
 #include <kern/console.h>
 #include <kern/monitor.h>
 #include <kern/kdebug.h>
@@ -26,9 +27,17 @@ static struct Command commands[] = {
 	{ "backtrace", "Stack", mon_backtrace },
 	{ "bawix", "by BaWiX_", BaWiX },
 	{ "clear", "- CLEAR Display", clr },
+	{ "memory", "- Memory Display", pamat },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
 	{ "exit", "Exit", exit },
 };
+
+int pamat(){
+memory_show();	
+	return 0;
+}
+
+
 int
 clr()
 {
@@ -320,7 +329,7 @@ cprintf("%m %s ",0xfd00,"0xfd00");
 cprintf("%m %s ",0xfe00,"0xfe00");
 cprintf("%m %s ",0xff00,"0xff00");
 
-	
+
 return 0;
 }
 

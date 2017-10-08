@@ -16,6 +16,7 @@ int mon_help(int argc, char **argv, struct Trapframe *tf);
 int mon_kerninfo(int argc, char **argv, struct Trapframe *tf);
 int BaWiX();
 int clr();
+int pamat();
 int exit();
 int mon_backtrace(int argc, char **argv, struct Trapframe *tf);
 
