@@ -7,6 +7,7 @@
 #include <inc/assert.h>
 #include <inc/x86.h>
 
+#include <kern/JOMA.c>
 #include <kern/console.h>
 #include <kern/monitor.h>
 #include <kern/kdebug.h>
@@ -24,8 +25,28 @@ struct Command {
 
 static struct Command commands[] = {
 	{ "help", "Display this list of commands", mon_help },
+	{ "backtrace", "Stack", mon_backtrace },
+	{ "bawix", "by BaWiX_", BaWiX },
+	{ "clear", "- CLEAR Display", clr },
+	{ "memory", "- Memory Display", pamat },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
+	{ "exit", "Exit", exit },
 };
+
+int pamat(){
+memory_show();	
+	return 0;
+}
+
+
+int
+clr()
+{
+cprintf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
+return 0;
+}
+
+
 
 /***** Implementations of basic kernel monitor commands *****/
 
@@ -37,6 +58,22 @@ mon_help(int argc, char **argv, struct Trapframe *tf)
 	for (i = 0; i < ARRAY_SIZE(commands); i++)
 		cprintf("%s - %s\n", commands[i].name, commands[i].desc);
 	return 0;
+}
+int
+exit()
+{
+    cprintf("by BaWiX_ \n");
+//asm("movw $0x1000,%ax;	movw %ax,%ss;	movw $0xf000,%sp;	movw $0x5307,%ax;	movw $1,%bx;	movw $3,%cx;	int  $0x15");
+
+asm("    mov %ax, 0x1000;    mov %ax, %ss;    mov %sp, 0xf000;    mov %ax, 0x5307;    mov %bx, 0x0001;    mov %cx, 0x0003; int $0x15 ;");
+return 0;
+}
+
+int
+BaWiX()
+{
+color();
+return 0;
 }
 
 int
@@ -58,8 +95,24 @@ mon_kerninfo(int argc, char **argv, struct Trapframe *tf)
 int
 mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 {
-	// Your code here.
-	return 0;
+
+uint32_t* ebp = (uint32_t*) read_ebp();
+	cprintf("Stack backtrace:\n");
+	while (ebp) {
+		uint32_t eip = ebp[1];
+		struct Eipdebuginfo info;
+		debuginfo_eip(eip,&info);
+		cprintf("\t%s:%d: %.*s+%d\n",info.eip_file, info.eip_line,info.eip_fn_namelen, info.eip_fn_name, eip-info.eip_fn_addr);
+		cprintf("ebp %x  eip %x  args", ebp, ebp[1]);
+		int i;
+		for (i = 2; i <= 6; ++i)
+			cprintf(" %08.x", ebp[i]);
+		cprintf("\n");
+		ebp = (uint32_t*) *ebp;
+	}
+return 0;
+
+
 }
 
 
@@ -108,21 +161,37 @@ runcmd(char *buf, struct Trapframe *tf)
 	return 0;
 }
 
+
+
 void
 monitor(struct Trapframe *tf)
 {
 	char *buf;
 
-	cprintf("Welcome to the JOS kernel monitor!\n");
+	cprintf("\n\n\n\n");
+
+	cprintf("%m%s",0x0200,"      ##  #######  ##    ##    ###    ##    ##     #######   ######  \n      ## ##     ## ##   ##    ## ##    ##  ##     ##     ## ##    ## \n      ## ##     ## ##  ##    ##   ##    ####      ##     ## ##       \n      ## ##     ## #####    ##     ##    ##       ##     ##  ######  \n##    ## ##     ## ##  ##   #########    ##       ##     ##       ## \n##    ## ##     ## ##   ##  ##     ##    ##       ##     ## ##    ## \n ######   #######  ##    ## ##     ##    ##        #######   ######  \n");
+	
+	cprintf("\n\nWelcome to the Jokay OS kernel monitor!\n");
 	cprintf("Type 'help' for a list of commands.\n");
 
 	if (tf != NULL)
 		print_trapframe(tf);
 
 	while (1) {
+		
 		buf = readline("K> ");
+		if((*buf==-30)||(*buf==91)){
+		
+					cprintf("%d",*buf);
+		}
+		
+	
+		
+		
 		if (buf != NULL)
 			if (runcmd(buf, tf) < 0)
 				break;
-	}
+		
+		}
 }
