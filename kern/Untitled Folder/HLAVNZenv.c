@@ -115,14 +115,31 @@ void
 env_init(void)
 {
 	// Set up envs array
+	memset((void*) envs, 0, sizeof(struct Env) * NENV);
 	// LAB 3: Your code here.
-	for(size_t i=0;i!=NENV-1;i+=1){
-		envs[i].env_id=0;		//asi explicitne
-		envs[i].env_link=&envs[i+1];
-	}
-	envs[NENV-1].env_link=NULL;
-	env_free_list=&envs[1];
+	/*
+	env_free_list=&envs[NENV - 1];
+	envs[NENV - 1].env_link=NULL;
+	envs[NENV - 1].env_status = ENV_FREE;
+	for(int i=NENV - 2; i>=0;i--)
+	{
+		envs[i].env_status=ENV_FREE;
+		envs[i].env_link = env_free_list;
+		env_free_list=&envs[i];
+	}*/
 
+    int i = 0;
+    env_free_list = envs;
+   
+    for ( ;i+1 < NENV;i ++) {
+      envs[i].env_id = 0;
+      envs[i].env_status = ENV_FREE;
+      envs[i].env_link = &envs[i+1];
+    }
+    
+    envs[i].env_id = 0;
+    envs[i].env_status = ENV_FREE;
+	envs[i].env_link = NULL;	
 	// Per-CPU part of the initialization
 	env_init_percpu();
 }
@@ -185,14 +202,14 @@ env_setup_vm(struct Env *e)
 	//    - The functions in kern/pmap.h are handy.
 
 	// LAB 3: Your code here.
-	e->env_pgdir=page2kva(p);
-	for(size_t i=0;i!=PDX(UTOP);i+=1){
-		e->env_pgdir[i]=0;
-	}
-	for(size_t i=0;i!=NPDENTRIES;i+=1){
-		e->env_pgdir[i]=kern_pgdir[i];
-	}
-	p->pp_ref+=1;
+	p->pp_ref++; // zvysenie referencie na stranku
+	e->env_pgdir = page2kva(p); // vytvorenie directory pre environment
+	//memcpy(&(e->env_pgdir[PDX(UTOP)]),&kern_pgdir[PDX(UTOP)], PGSIZE - (&(e->env_pgdir[PDX(UTOP)]) - e->env_pgdir));
+	
+	//memmove(e->env_pgdir, kern_pgdir, PGSIZE);
+	// kopirovanie vsetkych zaznamov nad UTOP do directory environmentu z kernel directory
+	memcpy(&(e->env_pgdir[PDX(UTOP)]),&kern_pgdir[PDX(UTOP)], (NPDENTRIES - PDX(UTOP)) * sizeof(pte_t));
+	
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
 	e->env_pgdir[PDX(UVPT)] = PADDR(e->env_pgdir) | PTE_P | PTE_U;
@@ -275,21 +292,24 @@ region_alloc(struct Env *e, void *va, size_t len)
 {
 	// LAB 3: Your code here.
 	// (But only if you need it for load_icode.)
-	//
+	struct PageInfo *p;
+	// najprv treba zarovnat koniec aby sme pokryly celu stranku kde je koniec
+	void * va_end = ROUNDUP(va + len, PGSIZE); // zarovnanie konca
+	va= ROUNDDOWN(va,PGSIZE); // zarovnanie zaciatku
+	for(; va < va_end; va+=PGSIZE) 
+	{
+		p=page_alloc(0); // alokacia stranky
+		if(!p)
+			panic("panic, cant allock page for environment");
+		int err_code=page_insert(e->env_pgdir,p,va, PTE_U | PTE_W); // vlozenie mapovania stranky
+		if(err_code != 0)
+			panic("page insert failed, %e\n",err_code);
+	}
+
 	// Hint: It is easier to use region_alloc if the caller can pass
 	//   'va' and 'len' values that are not page-aligned.
 	//   You should round va down, and round (va + len) up.
 	//   (Watch out for corner-cases!)
-	
-	uintptr_t addr=ROUNDDOWN((uintptr_t)va,PGSIZE);
-	 uintptr_t end=ROUNDUP ((uintptr_t)va+len,PGSIZE);
-	while(addr<end){
-		struct PageInfo *page=page_alloc(0);
-		if(page==NULL)panic("region_alloc:out of memory");
-		page_insert(e->env_pgdir,page,(void*)addr,PTE_U|PTE_W|PTE_P);
-		addr+=PGSIZE;
-	}
-
 }
 
 //
@@ -351,24 +371,44 @@ load_icode(struct Env *e, uint8_t *binary)
 	// at virtual address USTACKTOP - PGSIZE.
 
 	// LAB 3: Your code here.
-	struct Elf *elfheader=(struct Elf*)binary;
-	if(elfheader->e_magic!=ELF_MAGIC)panic("load_icode:ELF error");
 	
-	struct Proghdr* ph=(struct Proghdr*)(binary+elfheader->e_phoff);
-	struct Proghdr* eph=ph+elfheader->e_phnum;
 
-	lcr3(PADDR(e->env_pgdir));
-	for(;ph<eph;ph+=1){
-		if(ph->p_type==ELF_PROG_LOAD){
-			if(ph->p_filesz>ph->p_memsz)panic("load_icode:filesize>memsize");
-			region_alloc(e,(void*)ph->p_va,ph->p_memsz);
-			memmove((void*)ph->p_va,binary+ph->p_offset,ph->p_filesz);
-			memset((void*)(ph->p_va+ph->p_filesz),0,ph->p_memsz-ph->p_filesz);
-		}
-	}
-	e->env_tf.tf_eip=elfheader->e_entry;
-	region_alloc(e,(void*)(USTACKTOP-PGSIZE),PGSIZE);
+	struct Proghdr *ph, *eph;  // programove hlavicky
+    struct Elf *elfhdr; // hlavicka elf
+    struct PageInfo *pp; // stranky
 
+    elfhdr = (struct Elf *) binary; // namapovanie hlavicky na zaciatok binarky
+    if (elfhdr->e_magic != ELF_MAGIC) // kontrola magic number
+        panic("load_icode : not an valid ELF.\n");
+  
+    ph = (struct Proghdr *) (binary + elfhdr->e_phoff);
+    eph = ph + elfhdr->e_phnum; // koniec programovych hlaviciek
+
+    // user and kernel has the same mapping above VA ULIM, so, after
+    // changing the pgdir, the fllowing code can still work.
+    // And that is why user and the kernel shound have the same mapping 
+    // above VA ULIM.
+    lcr3(PADDR(e->env_pgdir)); // prepnutie do mapovania environmentu
+
+    for (; ph < eph; ph++) {
+        if (ph->p_type != ELF_PROG_LOAD)  // programova hlavicka sa ma nacitat
+            continue;
+        region_alloc(e, (void*)ph->p_va, ph->p_memsz); // alokacia miesta
+        memset((void *)ROUNDDOWN((uintptr_t)ph->p_va, PGSIZE), 0, ROUNDUP(ph->p_memsz, PGSIZE)); // zapis 0  
+        memmove((void*)ph->p_va, binary+ph->p_offset, ph->p_filesz); // zapis dat environmentu do ramky
+    }
+    lcr3(PADDR(kern_pgdir)); // prepnutie spat do mapovania jadra
+    e->env_tf.tf_eip = elfhdr->e_entry; // nastavenie EÍP environmentu na vstupny bod environmentu - pri spusteni 
+    // environmentu sa nahra tato hodnota o instrukcneho pointeru - zacne sa vykonavat kod environmentu
+
+    // Now map one page for the program's initial stack
+    // at virtual address USTACKTOP - PGSIZE.
+
+    // LAB 3: Your code here.
+	region_alloc(e, (void*)(USTACKTOP - PGSIZE), PGSIZE); // alokacia zasobnika
+	
+	//memset((void *)(USTACKTOP - 4),0,4);
+	e->env_tf.tf_esp = USTACKTOP; // nastavenie zasobnika
 }
 
 //
@@ -381,13 +421,13 @@ load_icode(struct Env *e, uint8_t *binary)
 void
 env_create(uint8_t *binary, enum EnvType type)
 {
-	// LAB 3: Your code here.
-	struct Env* e;
-	int res=env_alloc(&e,0);
-	if(res==-E_NO_FREE_ENV)panic("env_create:no free env");
-	if(res==-E_NO_MEM)panic("env_create:no free memory");
+// LAB 3: Your code here.
+	struct Env *e;
+	int ret_code = env_alloc(&e,0);
+	if(ret_code < 0)
+		panic("failed to allocate environment %e",ret_code);
 	load_icode(e,binary);
-	e->env_type=type;
+	e->env_type = type;
 }
 
 //
@@ -504,13 +544,18 @@ env_run(struct Env *e)
 	//	e->env_tf to sensible values.
 
 	// LAB 3: Your code here.
-	//int is_cont_sw=curenv&& curenv->env_status==ENV_RUNNING;
-	//if (is_cont_sw)curenv->env_status=ENV_RUNNABLE;
-	if (curenv && curenv->env_status==ENV_RUNNING)curenv->env_status=ENV_RUNNABLE;
-	curenv=e;
-	curenv->env_status=ENV_RUNNING;
-	curenv->env_runs++;
-	lcr3(PADDR(curenv->env_pgdir));
-	
-	env_pop_tf(&e->env_tf);
+if(curenv != NULL) // ak existuje nejake prostredie
+	{
+		if(curenv->env_status == ENV_RUNNING) // ak bezi prostredie zastav ho
+			curenv->env_status= ENV_RUNNABLE;
+	}
+	curenv=e; // nastav environment co chceme spustit ako current
+	curenv->env_status= ENV_RUNNING; // status
+	curenv->env_runs++; 
+	lcr3(PADDR(curenv->env_pgdir)); // prepnutie o mapovania environmentu
+	//our code here:
+	//unlock_kernel();
+
+	env_pop_tf(&curenv->env_tf); // nastavenie registrov podla environmentu
 }
+
