@@ -58,7 +58,7 @@ i386_init(void)
 
 	// We only have one user environment for now, so just run it.
 	env_run(&envs[0]);//0
-	//env_run(&envs[9]); CHYBNE
+	// env_run(&envs[9]); //CHYBNE
 }
 
 
