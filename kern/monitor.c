@@ -168,11 +168,11 @@ monitor(struct Trapframe *tf)
 {
 	char *buf;
 
-	/*cprintf("\n\n\n\n");
+	cprintf("\n\n\n\n");
 
 	cprintf("%m%s",0x0200,"      ##  #######  ##    ##    ###    ##    ##     #######   ######  \n      ## ##     ## ##   ##    ## ##    ##  ##     ##     ## ##    ## \n      ## ##     ## ##  ##    ##   ##    ####      ##     ## ##       \n      ## ##     ## #####    ##     ##    ##       ##     ##  ######  \n##    ## ##     ## ##  ##   #########    ##       ##     ##       ## \n##    ## ##     ## ##   ##  ##     ##    ##       ##     ## ##    ## \n ######   #######  ##    ## ##     ##    ##        #######   ######  \n");
 	
-	cprintf("\n\nWelcome to the Jokay OS kernel monitor!\n");*/
+	cprintf("\n\nWelcome to the Jokay OS kernel monitor!\n");
 	cprintf("Welcome to the JOS kernel monitor!\n");
 	cprintf("Type 'help' for a list of commands.\n");
 
