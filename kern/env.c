@@ -119,7 +119,26 @@ env_init(void)
 {
 	// Set up envs array
 	// LAB 3: Your code here.
+		
 
+	int i = NENV - 1;
+	
+	for(;i >= 0; i--) {
+	  envs[i].env_status = ENV_FREE; // 0
+    	  envs[i].env_id = 0;
+    	  envs[i].env_link = env_free_list;
+	  env_free_list = &envs[i];
+	}
+/* CHYBNY
+	
+	int i;
+	for(i = 0;i < NENV; i++) {
+	  envs[i].env_status = ENV_FREE; // 0
+    	  envs[i].env_id = 0;
+    	  envs[i].env_link = env_free_list;
+	  env_free_list = &envs[i];
+	}
+	*/
 	// Per-CPU part of the initialization
 	env_init_percpu();
 }
@@ -182,7 +201,9 @@ env_setup_vm(struct Env *e)
 	//    - The functions in kern/pmap.h are handy.
 
 	// LAB 3: Your code here.
-
+	e->env_pgdir = (pde_t*)page2kva(p);	  //env sa priradi adresa z page dir. table danej stranky
+	p->pp_ref++;				  //stranka je pouzita (pre env) -> zdvihnut pp_ref
+	memcpy(e->env_pgdir, kern_pgdir, PGSIZE); //netreba alokovat viac stranok pre kern pg tab. -> mapovania su staticke
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
 	e->env_pgdir[PDX(UVPT)] = PADDR(e->env_pgdir) | PTE_P | PTE_U;
@@ -279,6 +300,17 @@ region_alloc(struct Env *e, void *va, size_t len)
 	//   'va' and 'len' values that are not page-aligned.
 	//   You should round va down, and round (va + len) up.
 	//   (Watch out for corner-cases!)
+	char *begin = ROUNDDOWN(va, PGSIZE), *end = ROUNDUP(va + len, PGSIZE);
+
+	for(; begin < end; begin += PGSIZE) {
+	  struct PageInfo *p = page_alloc(0);	//ALLOC_ZERO = 1, 0 -> nevynuluje sa -> netreba inicializovat mapovanie stranky
+	  if(!p)				//p -> netreba dvihat pp_ref -> dviha sa v page_insert
+	    panic("region_alloc(): Not enough free pages in page_free_list");
+	  page_insert(e->env_pgdir, p, begin, PTE_W | PTE_U);
+	  /*if(page_insert(e->env_pgdir, p, begin, PTE_W | PTE_U) == -E_NO_MEM)
+	    panic("region_alloc(): ");*/
+	}
+	
 }
 
 //
@@ -335,11 +367,37 @@ load_icode(struct Env *e, uint8_t *binary)
 	//  What?  (See env_run() and env_pop_tf() below.)
 
 	// LAB 3: Your code here.
+	struct Elf *ELFHDR = (struct Elf*) binary;
+	struct Proghdr *ph, *eph;
+
+	if (ELFHDR->e_magic != ELF_MAGIC)
+	  panic("load_icode(): invalid ELF (next time use DWARF !!!)");
+
+	ph = (struct Proghdr *) ((uint8_t *) ELFHDR + ELFHDR->e_phoff);
+	eph = ph + ELFHDR->e_phnum;
+
+	lcr3(PADDR(e->env_pgdir)); //zmen obsah registra cr3 -> prepnutie adresneho miesta
+
+	
+	for (; ph < eph; ph++) {
+	  if(ph->p_type == ELF_PROG_LOAD) {
+	    if(ph->p_filesz > ph->p_memsz)  //The ELF header should have ph->p_filesz <= ph->p_memsz
+	      panic("load_icode(): ph->p_filesz > ph->p_memsz");
+
+	    region_alloc(e, (void *)ph->p_va, ph->p_memsz);
+	    memcpy((void *) ph->p_va, (void *) (binary + ph->p_offset), ph->p_filesz); //od p_va nakopiruj p_filesz dat z (binary + offset)
+	    memset((void *) (ph->p_pa + ph->p_filesz), 0, ph->p_memsz - ph->p_filesz);
+	  }
+	}
+
+	lcr3(PADDR(kern_pgdir));		// zmen s5 adresny priestor
+	e->env_tf.tf_eip = ELFHDR->e_entry;	//zaciatocna adresa programu inc/trap.h
+	e->env_tf.tf_esp = USTACKTOP;		//nastavenie esp - vrchol zasobnika, netreba?
 
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
-
 	// LAB 3: Your code here.
+	region_alloc(e, (void *) (USTACKTOP-PGSIZE), PGSIZE);	//alokacia a namapovanie 1 strany ako uzivatelsky zasobnik
 }
 
 //
@@ -353,6 +411,11 @@ void
 env_create(uint8_t *binary, enum EnvType type)
 {
 	// LAB 3: Your code here.
+	struct Env *e;
+	if(env_alloc(&e, 0) != 0)
+	  panic("env_create(): env_free_list or page_free_list is empty");
+	load_icode(e, binary);
+	e->env_type = type;
 }
 
 //
@@ -484,6 +547,16 @@ env_run(struct Env *e)
 
 	// LAB 3: Your code here.
 
-	panic("env_run not yet implemented");
+	if(curenv != NULL)
+	  if (curenv->env_status == ENV_RUNNING)
+	    curenv->env_status = ENV_RUNNABLE;
+
+	lcr3(PADDR(e->env_pgdir));  //prepni sa na adresny priestor daneho prostredia
+	curenv = e;
+  	e->env_status = ENV_RUNNING;
+  	e->env_runs++;
+	env_pop_tf(&e->env_tf);
+
+	//panic("env_run not yet implemented");
 }
 
