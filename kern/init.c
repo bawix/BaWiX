@@ -75,7 +75,6 @@ i386_init(void)
 	ENV_CREATE(user_primes, ENV_TYPE_USER);
 #endif // TEST*
 
-<<<<<<< HEAD
 	// Schedule and run the first user environment!
 	sched_yield();
 }
@@ -110,11 +109,9 @@ boot_aps(void)
 		while(c->cpu_status != CPU_STARTED)
 			;
 	}
-=======
 	// We only have one user environment for now, so just run it.
 	env_run(&envs[0]);//0
 	// env_run(&envs[9]); //CHYBNE
->>>>>>> lab3
 }
 
 // Setup code for APs

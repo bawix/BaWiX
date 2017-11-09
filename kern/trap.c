@@ -195,7 +195,6 @@ trap_dispatch(struct Trapframe *tf)
 {
 	// Handle processor exceptions.
 	// LAB 3: Your code here.
-<<<<<<< HEAD
 
 	// Handle spurious interrupts
 	// The hardware sometimes raises these because of noise on the
@@ -210,7 +209,6 @@ trap_dispatch(struct Trapframe *tf)
 	// interrupt using lapic_eoi() before calling the scheduler!
 	// LAB 4: Your code here.
 
-=======
 	if(tf->tf_trapno==T_PGFLT){
 		page_fault_handler(tf);
 		//cprintf(".%08x. user fault va %08x ip %08x\n",
@@ -232,7 +230,6 @@ trap_dispatch(struct Trapframe *tf)
 		tf->tf_regs.reg_esi);
 		return;
 	}
->>>>>>> lab3
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);
 	if (tf->tf_cs == GD_KT)
