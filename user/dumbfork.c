@@ -14,12 +14,18 @@ umain(int argc, char **argv)
 
 	// fork a child process
 	who = dumbfork();
-
+cprintf("who=%x\n",who);
 	// print a message and yield to the other a few times
 	for (i = 0; i < (who ? 10 : 20); i++) {
 		cprintf("%d: I am the %s!\n", i, who ? "parent" : "child");
 		sys_yield();
 	}
+	/*for (i = 0; i <  20; i++) {
+		if(who==0)cprintf("%d: I am the child!\n", i);
+		else cprintf("%d: I am the parent!\n", i);
+		
+		sys_yield();
+	}*/
 }
 
 void
@@ -51,6 +57,7 @@ dumbfork(void)
 	// except that in the child, this "fake" call to sys_exofork()
 	// will return 0 instead of the envid of the child.
 	envid = sys_exofork();
+	cprintf("ale returnol som %x\n",envid);
 	if (envid < 0)
 		panic("sys_exofork: %e", envid);
 	if (envid == 0) {
@@ -59,6 +66,7 @@ dumbfork(void)
 		// is no longer valid (it refers to the parent!).
 		// Fix it and return 0.
 		thisenv = &envs[ENVX(sys_getenvid())];
+		
 		return 0;
 	}
 
