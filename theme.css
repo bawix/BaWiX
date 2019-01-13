@@ -466,7 +466,7 @@ input[disabled], input[readonly], textarea[disabled], textarea[readonly] { backg
 
 .menu .menu_content { background: #363636 !important; }
 
-.menu .menu_filter_container { background: #303e4d; }
+.menu .menu_filter_container { background: #fff; } /* TUUUUU */ 
 
 .menu .menu_filter_container input.menu_filter { border: 1px solid #424242; }
 
