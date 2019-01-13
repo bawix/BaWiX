@@ -758,7 +758,7 @@ input[disabled], input[readonly], textarea[disabled], textarea[readonly] { backg
 
 #limit_meter_message_body { color: #949494; }
 
-.channel_header { background: pink; box-shadow: inset 1px 0 0 0 #303e4d; }  /* TUUUUT*/
+.channel_header { background: #363636; box-shadow: inset 1px 0 0 0 #303e4d; }  /* TUUUUT*/
 
 .channel_header .blue_on_hover:hover { color: #e6e6e6; }
 
