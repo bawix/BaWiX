@@ -126,7 +126,7 @@ h1 a:active, h1 a:hover, h1 a:link, h1 a:visited { color: #e6e6e6; }
 
 #quick_switcher_btn > i { color: #949494; }
 
-#quick_switcher_btn:active, #quick_switcher_btn:hover { background: #303e4d; border-color: #303e4d; }
+#quick_switcher_btn:active, #quick_switcher_btn:hover { background: #949494; border-color: #949494; }  
 
 #quick_switcher_btn:active > i, #quick_switcher_btn:hover > i { color: #949494; }
 
